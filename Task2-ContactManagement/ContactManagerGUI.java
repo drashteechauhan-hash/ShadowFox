@@ -228,7 +228,6 @@ public class ContactManagerGUI extends JFrame {
     }
 
     // ---------------- BOTTOM PANEL ----------------
-    // ---------------- BOTTOM PANEL ----------------
     private JPanel buildBottomPanel() {
         JPanel panel = new JPanel(new FlowLayout(FlowLayout.CENTER, 14, 0));
         panel.setBackground(BG_MAIN);
