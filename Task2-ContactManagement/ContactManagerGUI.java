@@ -228,6 +228,7 @@ public class ContactManagerGUI extends JFrame {
     }
 
     // ---------------- BOTTOM PANEL ----------------
+    // ---------------- BOTTOM PANEL ----------------
     private JPanel buildBottomPanel() {
         JPanel panel = new JPanel(new FlowLayout(FlowLayout.CENTER, 14, 0));
         panel.setBackground(BG_MAIN);
@@ -257,8 +258,19 @@ public class ContactManagerGUI extends JFrame {
         exportAllBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
         exportAllBtn.addActionListener(e -> exportAllContacts());
 
+        JButton importBtn = new JButton("Import (.vcf)");
+        importBtn.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        importBtn.setForeground(TEXT_DARK);
+        importBtn.setBackground(new Color(200, 255, 210));
+        importBtn.setFocusPainted(false);
+        importBtn.setBorder(new EmptyBorder(14, 30, 14, 30));
+        importBtn.setOpaque(true);
+        importBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        importBtn.addActionListener(e -> importContacts());
+
         panel.add(addBtn);
         panel.add(exportAllBtn);
+        panel.add(importBtn);
         return panel;
     }
 
@@ -396,6 +408,100 @@ public class ContactManagerGUI extends JFrame {
                         "Export Error", JOptionPane.ERROR_MESSAGE);
             }
         }
+    }
+
+    // ---------------- VCARD IMPORT (Tier 2 - Creative Upgrade) ----------------
+    private void importContacts() {
+        JFileChooser chooser = new JFileChooser();
+        chooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("VCard files (*.vcf)", "vcf"));
+        int choice = chooser.showOpenDialog(this);
+
+        if (choice != JFileChooser.APPROVE_OPTION) {
+            return;
+        }
+
+        java.io.File file = chooser.getSelectedFile();
+        List<Contact> parsedContacts = new ArrayList<>();
+        int skippedCount = 0;
+
+        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(file))) {
+            String line;
+            String name = null;
+            String phone = null;
+            String email = null;
+            boolean insideCard = false;
+
+            while ((line = reader.readLine()) != null) {
+                line = line.trim();
+
+                if (line.equalsIgnoreCase("BEGIN:VCARD")) {
+                    insideCard = true;
+                    name = null;
+                    phone = null;
+                    email = null;
+                } else if (line.equalsIgnoreCase("END:VCARD")) {
+                    if (insideCard && name != null && phone != null && email != null) {
+                        parsedContacts.add(new Contact(name, phone, email));
+                    } else if (insideCard) {
+                        skippedCount++;
+                    }
+                    insideCard = false;
+                } else if (insideCard && line.toUpperCase().startsWith("FN:")) {
+                    name = line.substring(3).trim();
+                } else if (insideCard && line.toUpperCase().startsWith("TEL:")) {
+                    phone = line.substring(4).trim().replaceAll("[^0-9]", "");
+                } else if (insideCard && line.toUpperCase().startsWith("EMAIL:")) {
+                    email = line.substring(6).trim();
+                }
+            }
+        } catch (java.io.IOException ex) {
+            JOptionPane.showMessageDialog(this, "Failed to read file: " + ex.getMessage(),
+                    "Import Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        if (parsedContacts.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "No valid contacts found in this file.",
+                    "Nothing Imported", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        int addedCount = 0;
+        int duplicateCount = 0;
+        int invalidCount = 0;
+
+        for (Contact c : parsedContacts) {
+            String error = validateContact(c.name, c.phone, c.email, null);
+            if (error != null) {
+                invalidCount++;
+                continue;
+            }
+
+            boolean isDuplicate = false;
+            for (Contact existing : contacts) {
+                if (existing.phone.equals(c.phone)) {
+                    isDuplicate = true;
+                    break;
+                }
+            }
+
+            if (isDuplicate) {
+                duplicateCount++;
+            } else {
+                contacts.add(c);
+                addedCount++;
+            }
+        }
+
+        refreshCardList();
+
+        StringBuilder summary = new StringBuilder();
+        summary.append(addedCount).append(" contact(s) imported successfully.");
+        if (duplicateCount > 0) summary.append("\n").append(duplicateCount).append(" duplicate(s) skipped.");
+        if (invalidCount > 0) summary.append("\n").append(invalidCount).append(" invalid entr(y/ies) skipped.");
+        if (skippedCount > 0) summary.append("\n").append(skippedCount).append(" incomplete card(s) skipped.");
+
+        JOptionPane.showMessageDialog(this, summary.toString(), "Import Complete", JOptionPane.INFORMATION_MESSAGE);
     }
 
     // Builds a single VCard 3.0 formatted text block for one contact
