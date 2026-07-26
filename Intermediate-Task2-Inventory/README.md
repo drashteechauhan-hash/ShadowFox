@@ -28,3 +28,7 @@ A "Barcode ID" search field at the top lets the user type a barcode and press En
 
 1. Make sure JDK is installed (`java -version` to check)
 2. Compile and run the GUI version:
+
+## Tech Used
+
+Java, Swing (JFrame, JPanel, Timer for animations), OOP (Encapsulation via the Product class)
